@@ -137,18 +137,37 @@ app.post("/save-email", async (req, res) => {
             return res.status(400).json({ error: "Invalid email address." });
         }
 
-        // Log or save the email
-        console.log(`Received email: ${email}`);
+        // Prepare the payload to create a customer on Shopify
+        const customerPayload = {
+            customer: {
+                email: email,
+                tags: "Email Subscriber", // Optionally, you can tag customers as Email Subscribers
+                accepts_marketing: true, // This marks the customer as subscribed
+            },
+        };
 
-        // If you want to save to a database or file, replace the following line
-        // Example: Save email to a database
-        // await database.saveEmail(email);
+        // Make API request to Shopify to create or update the customer
+        const response = await axios.post(
+            "https://proluxuryhome.com/admin/api/2024-10/customers.json",
+            customerPayload,
+            {
+                headers: {
+                    "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
+                    "Content-Type": "application/json",
+                },
+            }
+        );
+
+        console.log("Shopify response:", response.data);
 
         // Respond with success
-        res.status(200).json({ message: "Email saved successfully." });
+        res.status(200).json({
+            message: "Email saved and subscribed successfully.",
+        });
     } catch (error) {
+        console.error("Error saving email to Shopify:", error);
         res.status(500).json({
-            error: "Failed to save email.",
+            error: "Failed to save email to Shopify.",
             details: error.message,
         });
     }
