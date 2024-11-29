@@ -130,6 +130,7 @@ app.get("/api/collection-products", async (req, res) => {
 app.post("/save-email", async (req, res) => {
     try {
         const { email } = req.body;
+
         console.log("Received body:", req.body);
 
         // Validate email
@@ -141,8 +142,12 @@ app.post("/save-email", async (req, res) => {
         const customerPayload = {
             customer: {
                 email: email,
-                tags: "Email Subscriber", // Optionally, you can tag customers as Email Subscribers
-                accepts_marketing: true, // This marks the customer as subscribed
+                tags: "Email Subscriber", // Optionally, you can tag customers
+                accepts_marketing: true, // Marks the customer as subscribed
+                email_marketing_consent: {
+                    state: "subscribed",
+                    consent_updated_at: new Date().toISOString(),
+                },
             },
         };
 
@@ -163,12 +168,16 @@ app.post("/save-email", async (req, res) => {
         // Respond with success
         res.status(200).json({
             message: "Email saved and subscribed successfully.",
+            data: response.data,
         });
     } catch (error) {
-        console.error("Error saving email to Shopify:", error);
+        console.error(
+            "Error saving email to Shopify:",
+            error.response?.data || error.message
+        );
         res.status(500).json({
             error: "Failed to save email to Shopify.",
-            details: error.message,
+            details: error.response?.data || error.message,
         });
     }
 });
