@@ -9,6 +9,62 @@ const PORT = process.env.PORT || 4000;
 app.use(cors());
 app.use(express.json());
 
+// New endpoint to save email
+app.post("/api/save-email", async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+    }
+
+    try {
+        // Create a new customer in Shopify
+        const response = await axios.post(
+            `https://proluxuryhome.com/admin/api/2024-10/customers.json`,
+            {
+                customer: {
+                    email,
+                    accepts_marketing: true, // Set this to false if you don't want to subscribe them to marketing emails
+                },
+            },
+            {
+                headers: {
+                    "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
+                    "Content-Type": "application/json",
+                },
+            }
+        );
+
+        // Respond with success
+        res.status(201).json({
+            message: "Email saved successfully!",
+            customer: response.data.customer,
+        });
+    } catch (error) {
+        console.error("Error saving email to Shopify:", error);
+
+        if (error.response) {
+            // API error from Shopify
+            res.status(error.response.status).json({
+                error: error.response.data,
+                message: "Failed to save email to Shopify",
+            });
+        } else if (error.request) {
+            // No response received
+            res.status(500).json({
+                error: "No response received from Shopify",
+                message: error.message,
+            });
+        } else {
+            // Other errors
+            res.status(500).json({
+                error: "Internal server error",
+                message: error.message,
+            });
+        }
+    }
+});
+
 // Endpoint to fetch products from a specific collection with metafields
 app.get("/api/collection-products", async (req, res) => {
     try {
@@ -70,7 +126,7 @@ app.get("/api/collection-products", async (req, res) => {
 
         const productsWithMetafields = productsResponse.data.products.map(
             (product) => ({
-                id: product.id,
+                id: product.options.id,
                 title: product.title,
                 product_type: product.product_type,
                 admin_graphql_api_id: product.admin_graphql_api_id,
@@ -123,62 +179,6 @@ app.get("/api/collection-products", async (req, res) => {
                 message: error.message,
             });
         }
-    }
-});
-
-// Save email endpoint
-app.post("/save-email", async (req, res) => {
-    try {
-        const { email } = req.body;
-
-        console.log("Received body:", req.body);
-
-        // Validate email
-        if (!email || !/\S+@\S+\.\S+/.test(email)) {
-            return res.status(400).json({ error: "Invalid email address." });
-        }
-
-        // Prepare the payload to create a customer on Shopify
-        const customerPayload = {
-            customer: {
-                email: email,
-                tags: "Email Subscriber", // Optionally, you can tag customers
-                accepts_marketing: true, // Marks the customer as subscribed
-                email_marketing_consent: {
-                    state: "subscribed",
-                    consent_updated_at: new Date().toISOString(),
-                },
-            },
-        };
-
-        // Make API request to Shopify to create or update the customer
-        const response = await axios.post(
-            "https://proluxuryhome.com/admin/api/2024-10/customers.json",
-            customerPayload,
-            {
-                headers: {
-                    "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
-                    "Content-Type": "application/json",
-                },
-            }
-        );
-
-        console.log("Shopify response:", response.data);
-
-        // Respond with success
-        res.status(200).json({
-            message: "Email saved and subscribed successfully.",
-            data: response.data,
-        });
-    } catch (error) {
-        console.error(
-            "Error saving email to Shopify:",
-            error.response?.data || error.message
-        );
-        res.status(500).json({
-            error: "Failed to save email to Shopify.",
-            details: error.response?.data || error.message,
-        });
     }
 });
 
