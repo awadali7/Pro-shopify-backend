@@ -81,7 +81,11 @@ app.get("/api/collection-products", async (req, res) => {
 
         console.log(
             "Products Response:",
-            JSON.stringify(productsResponse.data, null, 2)
+            JSON.stringify(
+                productsResponse.data.products[0].options[0].id,
+                null,
+                2
+            )
         );
 
         // Check if there are any products
@@ -126,7 +130,7 @@ app.get("/api/collection-products", async (req, res) => {
 
         const productsWithMetafields = productsResponse.data.products.map(
             (product) => ({
-                id: product.id,
+                id: product.options[0].id,
                 title: product.title,
                 product_type: product.product_type,
                 admin_graphql_api_id: product.admin_graphql_api_id,
