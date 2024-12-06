@@ -126,7 +126,7 @@ app.get("/api/collection-products", async (req, res) => {
 
         const productsWithMetafields = productsResponse.data.products.map(
             (product) => ({
-                id: product.options.id,
+                id: product.id,
                 title: product.title,
                 product_type: product.product_type,
                 admin_graphql_api_id: product.admin_graphql_api_id,
