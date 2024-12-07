@@ -79,31 +79,36 @@ app.get("/api/collection-products", async (req, res) => {
             }
         );
 
-        console.log(
-            "Products Response:",
-            JSON.stringify(
-                productsResponse.data.products[0].options[0].id,
-                null,
-                2
-            )
-        );
+        const products = productsResponse.data.products;
 
         // Check if there are any products
-        if (
-            !productsResponse.data.products ||
-            productsResponse.data.products.length === 0
-        ) {
+        if (!products || products.length === 0) {
             return res
                 .status(400)
                 .json({ error: "No products found in the collection" });
         }
 
-        // Extract product IDs
-        // const productIds = productsResponse.data.products
-        //     .map((product) => product.id)
-        //     .join(",");
+        // Fetch variants for each product
+        const productVariantsPromises = products.map(async (product) => {
+            const variantsResponse = await axios.get(
+                `https://proluxuryhome.com/admin/api/2024-10/products/${product.id}/variants.json`,
+                {
+                    headers: {
+                        "X-Shopify-Access-Token":
+                            process.env.SHOPIFY_ACCESS_TOKEN,
+                        "Content-Type": "application/json",
+                    },
+                }
+            );
+            return {
+                productId: product.id,
+                variants: variantsResponse.data.variants,
+            };
+        });
 
-        // Fetch metafields for these products
+        const productVariants = await Promise.all(productVariantsPromises);
+
+        // Fetch metafields for the collection
         const metafieldsResponse = await axios.get(
             `https://proluxuryhome.com/admin/api/2024-10/collections/366257340597/metafields.json`,
             {
@@ -111,12 +116,6 @@ app.get("/api/collection-products", async (req, res) => {
                     "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
                     "Content-Type": "application/json",
                 },
-                // params: {
-                //     metafield: {
-                //         owner_resource: "product",
-                //         owner_ids: productIds,
-                //     },
-                // },
             }
         );
 
@@ -128,28 +127,42 @@ app.get("/api/collection-products", async (req, res) => {
                 admin_graphql_api_id: metafield.admin_graphql_api_id,
             }));
 
-        const productsWithMetafields = productsResponse.data.products.map(
-            (product) => ({
-                id: product.options[0].id,
+        // Merge product data with variants
+        const productsWithVariants = products.map((product) => {
+            const productVariantData = productVariants.find(
+                (pv) => pv.productId === product.id
+            );
+            return {
+                id: product.id,
                 title: product.title,
                 product_type: product.product_type,
                 admin_graphql_api_id: product.admin_graphql_api_id,
                 image: product.image,
-            })
-        );
+                variants: productVariantData
+                    ? productVariantData.variants.map((variant) => ({
+                          id: variant.id,
+                          title: variant.title,
+                          price: variant.price,
+                          sku: variant.sku,
+                          admin_graphql_api_id: variant.admin_graphql_api_id,
+                      }))
+                    : [],
+            };
+        });
 
+        // Merge metafields and products with variants
         const mergedData = [];
         const maxLength = Math.max(
             metafieldsResponseFiltered.length,
-            productsWithMetafields.length
+            productsWithVariants.length
         );
 
         for (let i = 0; i < maxLength; i++) {
             if (i < metafieldsResponseFiltered.length) {
                 mergedData.push(metafieldsResponseFiltered[i]);
             }
-            if (i < productsWithMetafields.length) {
-                mergedData.push(productsWithMetafields[i]);
+            if (i < productsWithVariants.length) {
+                mergedData.push(productsWithVariants[i]);
             }
         }
 
@@ -161,23 +174,20 @@ app.get("/api/collection-products", async (req, res) => {
             data: mergedData,
         });
     } catch (error) {
-        // console.error("Error in /api/collection-products:", error);
+        console.error("Error in /api/collection-products:", error);
 
         // More detailed error response
         if (error.response) {
-            // The request was made and the server responded with a status code
             res.status(error.response.status).json({
                 error: error.response.data,
                 message: "Error fetching collection products",
             });
         } else if (error.request) {
-            // The request was made but no response was received
             res.status(500).json({
                 error: "No response received",
                 message: error.message,
             });
         } else {
-            // Something happened in setting up the request
             res.status(500).json({
                 error: "Error setting up the request",
                 message: error.message,
